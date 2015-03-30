@@ -24,13 +24,21 @@ def fetch_site_and_process(mod):
     old_version = old_version or '0.0.0'
     mod_with_version = mod.with_version(version)
     mod_with_old_version = mod.with_version(old_version)
+    # check version status
     assert mod_with_old_version <= mod_with_version, "{} should not be less than {}".format(version, old_version)
-    if mod_with_old_version < mod_with_version:
-        print("Found upgrade for {} from {} to {}".format(mod, old_version, version))
-    elif mod_with_old_version == mod_with_version:
+    if mod_with_old_version == mod_with_version:
         print("No upgrade for {}".format(mod))
         return
-    print("Featching dependencies...")
+    print("Found upgrade for {} from {} to {}".format(mod, old_version, version))
+    # ask template to collect changes and then write them
+    print('Fetching changelog...')
+    changelog = template.collect_changelogs(
+        mod_with_old_version, mod_with_version)
+    with open(mods + '/changelogs/' + mod_with_version.get_versioned_file_name(),
+              'w+') as o:
+        o.write(changelog)
+    print('Fetched.')
+    print("Fetching dependencies...")
     is_dep = True
     try:
         for dep in mod.dependencies:
