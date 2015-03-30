@@ -1,0 +1,219 @@
+System.setProperty('org.ajoberstar.grgit.auth.username', property('org.ajoberstar.grgit.auth.username'))
+System.setProperty('org.ajoberstar.grgit.auth.password', property('org.ajoberstar.grgit.auth.password'))
+// default tasks
+defaultTasks 'assemble', 'installServer', 'uploadData'
+// gradle git!
+buildscript {
+    repositories {
+        // jcenter()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.ajoberstar:gradle-git:1.1.0'
+    }
+}
+// some data for the task
+ext.modpackVersion = '1.2.1'
+ext.launcherVersion = '1.2.0'
+ext.launcherSourceDir = 'Launcher'
+ext.launcherWorkDir = launcherSourceDir + 'Copy'
+ext.pagesDir = 'Pages'
+ext.pagesSourceDir = 'PagesSource'
+ext.modpackSourceDir = 'somethinglikedire'
+ext.modpackWorkDir = 'somethinglikedirCopy'
+import org.apache.tools.ant.taskdefs.condition.Os
+ext.WINDOOFS = Os.isFamily(Os.FAMILY_WINDOWS)
+List<String> augmentCommandLine(Object... args) {
+    def largs = args as List
+    if (WINDOOFS) {
+        return ['cmd', '/c'] + largs
+    }
+    return ['sh', '-c'] + largs.join(' ')
+}
+// everything else is pretty self explanatory
+// some directory info follows:
+/*
+
+This file is in what is now referred to as the ProjectDir.
+Inside the ProjectDir, it will look like this (at different times):
+
+ProjectDir
+ | - Launcher
+   | - launcher files
+ | - LauncherCopy
+   | - A copy of Launcher, except that it has the version data replaced
+ | - Pages
+   | - data files
+ | - somethinglikedire
+   | - somethinglikedire mod pack data
+ | - somethinglikedireCopy
+   | - A copy of somethinglikedire, again with version data replaced
+
+We apply the launcher version to the files, build it, use it to build the modpack data,
+and upload all of it into Pages. Once it has been loaded into pages, we push and call it a release.
+
+*/
+task cleanCopyLauncher(type:Delete) {
+    delete launcherWorkDir
+}
+// deletes the build.gradle in launchercopy to ensure the version transfers
+task deleteGradleScript(type:Delete) {
+    delete "${launcherWorkDir}/build.gradle"
+}
+// Save all the build data
+task saveBuildData() {
+    inputs.dir "${launcherWorkDir}/.gradle"
+    outputs.dir "${launcherSourceDir}/.gradle"
+    doLast {
+        project.sync {
+            into "${launcherSourceDir}/.gradle"
+            from "${launcherWorkDir}/.gradle"
+        }
+    }
+    ['launcher', 'launcher-bootstrap', 'launcher-builder', 'launcher-fancy'].each {
+        inputs.dir "${launcherWorkDir}/${it}/build"
+        outputs.dir "${launcherSourceDir}/${it}/build"
+        doLast {
+            project.sync {
+                into "${launcherSourceDir}/${it}/build"
+                from "${launcherWorkDir}/${it}/build"
+            }
+        }
+    }
+}
+deleteGradleScript.mustRunAfter(saveBuildData)
+// Sync used to ensure the LauncherCopy directory doesn't have anything stupid
+task copyLauncher(type:Sync, dependsOn: [saveBuildData, deleteGradleScript]) {
+    def repl = 'build.gradle'
+    from(launcherSourceDir) {
+        // replace version
+        include repl
+        expand(launcherVersion: launcherVersion)
+    }
+    from(launcherSourceDir) {
+        // copy all else
+        exclude repl
+    }
+    into launcherWorkDir
+    outputs.upToDateWhen { false }
+}
+import org.ajoberstar.grgit.*
+import org.ajoberstar.grgit.operation.*
+void sharedRebase(ldir, String branchName) {
+    def grgit = Grgit.open(ldir)
+    grgit.checkout(branch: 'master')
+    grgit.pull(rebase: true, remote: 'upstream', branch: 'master')
+    grgit.push(force: true)
+    grgit.checkout(branch: branchName)
+    try {
+        grgit.merge(head: 'master', mode: MergeOp.Mode.NO_COMMIT)
+    } catch (Exception e) {
+        // failed to rebase, revert
+        println 'Rebase (merge --no-commit) failed, aborting'
+        throw e;
+    }
+    grgit.push(force: true)
+}
+task rebaseLauncher() << {
+    sharedRebase(launcherSourceDir, 'somethinglikedire')
+}
+task buildLauncher(type:GradleBuild, dependsOn: [copyLauncher]) {
+    dir = launcherWorkDir
+    buildFile = "${launcherWorkDir}/build.gradle"
+    tasks = ['build']
+}
+import java.util.jar.*
+task packLauncher(dependsOn: [buildLauncher]) << {
+    JarFile src = new JarFile(file("${launcherWorkDir}/launcher-fancy/build/libs/launcher-fancy-${launcherVersion}-all.jar"))
+    def targetFile = file("${pagesDir}/data/launcher.jar.pack")
+    delete targetFile
+    OutputStream target = new FileOutputStream(targetFile)
+    Pack200.Packer pak = Pack200.newPacker()
+    pak.pack(src, target)
+}
+task cleanModpack(type:Delete) {
+    delete modpackWorkDir
+}
+task updateModpackVersion(type:Sync, dependsOn: [cleanModpack]) {
+    from(modpackSourceDir) {
+        include 'src/config/BetterTitleScreen.cfg'
+        expand(modpackVersion: modpackVersion)
+    }
+    from(modpackSourceDir) {
+        exclude 'src/config/BetterTitleScreen.cfg'
+    }
+    into modpackWorkDir
+    outputs.upToDateWhen { false }
+}
+task buildModpack(type:JavaExec, dependsOn: [buildLauncher, updateModpackVersion]) {
+    classpath "${launcherWorkDir}/launcher-builder/build/libs/launcher-builder-${launcherVersion}-all.jar"
+    main 'com.skcraft.launcher.builder.PackageBuilder'
+    args '--version', modpackVersion, '--input', modpackWorkDir, '--output', "${modpackWorkDir}/dist", '--manifest-dest', "${modpackWorkDir}/dist/modpack.json"
+}
+task copyModpack(type:Sync, dependsOn: [buildModpack]) {
+    from "${modpackWorkDir}/dist"
+    into "${pagesDir}/data/dist/dire/"
+    outputs.upToDateWhen { false }
+}
+task updateVersions(type:Copy) {
+    from (pagesSourceDir) {
+        include 'data/jsons/latest.json'
+        expand(launcherVersion: launcherVersion)
+    }
+    from (pagesSourceDir) {
+        include 'data/jsons/packages.json'
+        expand(modpackVersion: modpackVersion)
+    }
+    from (pagesSourceDir) {
+        exclude 'data/jsons/latest.json'
+        exclude 'data/jsons/packages.json'
+    }
+    into pagesDir
+    outputs.upToDateWhen { false }
+}
+packLauncher.mustRunAfter(updateVersions)
+buildModpack.mustRunAfter(updateVersions)
+task assemble(dependsOn: [updateVersions, packLauncher, copyModpack]) {
+}
+import groovy.io.FileType
+// gradle-git saves the day (sorta...)
+task uploadData(dependsOn: [updateVersions]) << {
+    def grgit = Grgit.open(pagesDir)
+    // add --all
+    def list = []
+    file(pagesDir).eachFileRecurse (FileType.FILES) { file ->
+        list << file.toString()
+    }
+    grgit.remove(patterns: list, cached: true)
+    grgit.add(patterns: list)
+    // end add --all
+    grgit.commit(message: project.hasProperty('commitMsg')?project.property('commitMsg'):'Update data')
+    grgit.push()
+}
+uploadData.mustRunAfter(assemble)
+uploadData.mustRunAfter(updateVersions)
+uploadData.mustRunAfter(packLauncher)
+uploadData.mustRunAfter(copyModpack)
+task updateLauncher(dependsOn: [updateVersions, packLauncher, uploadData]) {
+}
+// server
+ext.export = mkdir('tmpexport')
+task createTempServer(type:JavaExec, dependsOn: [buildLauncher]) {
+    classpath "${launcherWorkDir}/launcher-builder/build/libs/launcher-builder-${launcherVersion}-all.jar"
+    main 'com.skcraft.launcher.builder.ServerCopyExport'
+    args '--source', "${modpackWorkDir}/src", '--dest', export
+}
+ext.base = 'C:/Users/Kenzie Togami/Desktop/SERVERS/something_like_dire/'
+task syncConfig(type:Sync, dependsOn: [createTempServer]) {
+    from export.toPath().resolve('config').toFile()
+    into base + 'config'
+    outputs.upToDateWhen { false }
+}
+task syncMods(type:Sync, dependsOn: [createTempServer]) {
+    from export.toPath().resolve('mods').toFile()
+    into base + 'mods'
+    outputs.upToDateWhen { false }
+}
+task installServer(type:Delete, dependsOn: [syncConfig, syncMods]) {
+    delete export
+}
