@@ -4,7 +4,7 @@ import fetch
 import subprocess
 import os
 
-for mod in modcfg.MODS:
+for mod in sorted(modcfg.MODS, key=lambda cfg: cfg.name):
     fetch.fetch_site_and_process(mod)
 
 print('Launching gradle...')
