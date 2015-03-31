@@ -16,6 +16,9 @@ class Template(ABC):
     def parse_site(self, mod, req):
         return None, None
 
+    def collect_changelogs(self, mod):
+        return None
+
     @abstractmethod
     def will_process(self, site):
         return False
