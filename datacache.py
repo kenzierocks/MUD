@@ -1,18 +1,18 @@
 __author__ = 'Kenzie Togami'
 import pickle
 import os
-from datalib import ReverseDict
 
 
 # initial de-pickle
 FILE = 'data/mods.pickle'
-mod_dict = ReverseDict()
+mod_dict = dict()
 
 
 def load():
     if os.path.isfile(FILE):
         with open(FILE, "rb") as data:
             mod_dict.update(pickle.load(data))
+            print(mod_dict)
 
 
 def save():
@@ -21,11 +21,11 @@ def save():
 
 
 def find_version(mod):
-    return mod_dict.invert().get(mod, None)
+    return mod_dict.get(mod, None)
 
 
 def put(extended_mod):
     version = extended_mod.version
-    mod_dict[str(version)] = extended_mod
+    mod_dict[extended_mod] = version
 
 load()

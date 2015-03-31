@@ -41,6 +41,8 @@ class ExtendedMod(Mod, Comparable):
         try:
             self.sver = Version.coerce(version)
         except:
+            import traceback
+            traceback.print_exc()
             pass
 
     def get_versioned_file_name(self):
