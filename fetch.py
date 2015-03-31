@@ -23,10 +23,11 @@ def fetch_site_and_process(mod):
     assert download, "no download link for {}".format(mod)
     old_version = old_version or '0.0.0'
     mod_with_version = mod.with_version(version)
+    mod_with_max_version = mod.with_version(mod.max_version, silent_on_fail=True)
     mod_with_old_version = mod.with_version(old_version)
     # check version status
     assert mod_with_old_version <= mod_with_version, "{} should not be less than {}".format(version, old_version)
-    if mod_with_old_version == mod_with_version:
+    if mod_with_old_version == mod_with_version or (mod.max_version and mod_with_version > mod_with_max_version):
         print("No upgrade for {}".format(mod))
         return
     print("Found upgrade for {} from {} to {}".format(mod, old_version, version))

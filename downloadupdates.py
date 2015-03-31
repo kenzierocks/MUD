@@ -7,6 +7,8 @@ import os
 for mod in sorted(modcfg.MODS, key=lambda cfg: cfg.name):
     fetch.fetch_site_and_process(mod)
 
+print('TEMPORARY: not gradling')
+__import__('sys').exit()
 print('Launching gradle...')
 env = dict(os.environ)
 env['GRADLE_INCREMENTAL'] = 'false'
