@@ -21,11 +21,11 @@ def save():
 
 
 def find_version(mod):
-    return mod_dict.get(mod, None)
+    return mod_dict.get(mod.name, None)
 
 
 def put(extended_mod):
     version = extended_mod.version
-    mod_dict[extended_mod] = version
+    mod_dict[extended_mod.name] = version
 
 load()
