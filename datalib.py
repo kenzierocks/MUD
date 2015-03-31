@@ -6,10 +6,13 @@ import collections.abc as collabc
 class Comparable(ABC):
     @abstractmethod
     def __cmp__(self, other):
-        return None
+        raise NotImplemented()
 
     def __eq__(self, other):
         return self.__cmp__(other) == 0
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def __hash__(self):
         return None  # unorderable by default
