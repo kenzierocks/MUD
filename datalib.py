@@ -21,10 +21,10 @@ class Comparable(ABC):
         return self.__cmp__(other) > 0
 
     def __le__(self, other):
-        return self.__lt__(other) or self.__eq__(other)
+        return self.__cmp__(other) <= 0
 
     def __ge__(self, other):
-        return self.__gt__(other) or self.__eq__(other)
+        return self.__cmp__(other) >= 0
 
 
 class ReverseDict(collabc.MutableMapping, Comparable):
