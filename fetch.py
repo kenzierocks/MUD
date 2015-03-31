@@ -34,10 +34,13 @@ def fetch_site_and_process(mod):
     print('Fetching changelog...')
     changelog = template.collect_changelogs(
         mod_with_old_version, mod_with_version)
-    with open(mods + '/changelogs/' + mod_with_version.get_versioned_file_name(),
-              'w+') as o:
-        o.write(changelog)
-    print('Fetched.')
+    if changelog:
+        with open(mods + '/changelogs/' + mod_with_version.get_versioned_file_name(),
+                  'w+') as o:
+            o.write(changelog)
+        print('Fetched.')
+    else:
+        print('No changelog.')
     print("Fetching dependencies...")
     is_dep = True
     try:
