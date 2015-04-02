@@ -22,7 +22,8 @@ def fetch_site_and_process(mod):
         version, download = template.parse_site(mod, requests.get(site), mod.max_version)
         assert version, "no version for {}".format(mod)
         assert download, "no download link for {}".format(mod)
-        old_version = old_version or '0.0.0'
+        had_old_ver = old_version is not None
+        old_version = old_version if had_old_ver else '0.0.0'
         mod_with_version = mod.with_version(version)
         mod_with_max_version = mod.with_version(mod.max_version, silent_on_fail=True)
         mod_with_old_version = mod.with_version(old_version)
@@ -32,6 +33,10 @@ def fetch_site_and_process(mod):
             print("No upgrade for {}".format(mod))
             return
         print("Found upgrade for {} from {} to {}".format(mod, old_version, version))
+        if had_old_ver:
+            print("Removing old version...")
+            os.remove(mods + '/' + mod_with_old_version.get_versioned_file_name())
+            print("Removed.")
         # ask template to collect changes and then write them
         print('Fetching changelog...')
         changelog = template.collect_changelogs(

@@ -63,6 +63,7 @@ class EasyTemplate(Template, ABC):
             if max_ver:
                 res = self.compare_version(mod, ver, max_ver)
                 if res > 0:  # version bigger than max
+                    print("{} has an upgrade to {}, but is limited to {}".format(mod.name, ver, max_ver))
                     continue
                 elif res == 0:  # perfect!
                     pass
