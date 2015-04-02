@@ -4,7 +4,7 @@ from data.comparators import *
 
 
 MODS = [Mod(name='Buildcraft', site='http://www.mod-buildcraft.com/releases/BuildCraft/',
-            do_not_pass='6.4.5'),
+            do_not_pass='6.4.6'),
         Mod(name='IndustrialCraft2',
             site='http://jenkins.ic2.player.to/job/IC2_experimental/lastSuccessfulBuild/artifact/build/libs/'),
         Mod(name='Thaumcraft', site='http://minecraft.curseforge.com/mc-mods/223628-thaumcraft/files'),
