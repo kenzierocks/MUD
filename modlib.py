@@ -16,10 +16,7 @@ class Mod:
 
     def with_version(self, version, compare=None, silent_on_fail=False):
         if isinstance(self, ExtendedMod):
-            extmod = self
-            extmod.version = version
-            extmod.comparator = compare or extmod.comparator
-            return self
+            compare = compare or self.comparator
         return ExtendedMod(self, version, compare, silent_on_fail)
 
     def get_dep_string(self):
